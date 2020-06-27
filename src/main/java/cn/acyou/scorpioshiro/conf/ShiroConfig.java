@@ -9,8 +9,14 @@ import org.apache.shiro.spring.LifecycleBeanPostProcessor;
 import org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor;
 import org.apache.shiro.spring.web.ShiroFilterFactoryBean;
 import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
+import org.apache.shiro.web.servlet.Cookie;
+import org.apache.shiro.web.servlet.SimpleCookie;
 import org.apache.shiro.web.session.mgt.DefaultWebSessionManager;
+import org.crazycake.shiro.RedisCacheManager;
+import org.crazycake.shiro.RedisManager;
+import org.crazycake.shiro.RedisSessionDAO;
 import org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
@@ -27,6 +33,19 @@ import java.util.Map;
  **/
 @Configuration
 public class ShiroConfig {
+
+    @Value("${spring.redis.host}")
+    private String host;
+
+    @Value("${spring.redis.port}")
+    private int port;
+
+    @Value("${spring.redis.timeout}")
+    private int timeout;
+
+    @Value("${spring.redis.password}")
+    private String password;
+
     @Bean(name = "shiroFilter")
     public ShiroFilterFactoryBean shiroFilter(SecurityManager securityManager) {
         ShiroFilterFactoryBean shiroFilterFactoryBean = new ShiroFilterFactoryBean();
@@ -103,9 +122,9 @@ public class ShiroConfig {
 
         /*————————————— 缓存 —————————————————*/
         //使用内存缓存实现：
-        defaultSecurityManager.setCacheManager(new MemoryConstrainedCacheManager());
+        //defaultSecurityManager.setCacheManager(new MemoryConstrainedCacheManager());
         //使用redis缓存实现
-        //defaultSecurityManager.setCacheManager(redisCacheManager());
+        defaultSecurityManager.setCacheManager(redisCacheManager());
         return defaultSecurityManager;
     }
 
@@ -118,7 +137,19 @@ public class ShiroConfig {
         defaultWebSessionManager.setGlobalSessionTimeout(1000 * 60 * 5);
         defaultWebSessionManager.setSessionValidationSchedulerEnabled(true);
         defaultWebSessionManager.setSessionIdCookieEnabled(true);
+        defaultWebSessionManager.setSessionIdCookie(shiroCookie());
+        defaultWebSessionManager.setSessionDAO(redisSessionDAO());
         return defaultWebSessionManager;
+    }
+
+    @Bean
+    public Cookie shiroCookie() {
+        Cookie cookie = new SimpleCookie();
+        cookie.setName("SCORPIO-AUTH");
+        cookie.setHttpOnly(true);
+        cookie.setDomain("/");
+        cookie.setMaxAge(-1);
+        return cookie;
     }
 
     @Bean
@@ -141,5 +172,39 @@ public class ShiroConfig {
     }
 
 
+    /**
+     * 配置shiro redisManager
+     * 使用的是shiro-redis开源插件
+     * @return
+     */
+    public RedisManager redisManager() {
+        RedisManager redisManager = new RedisManager();
+        redisManager.setHost(host + ":" + port);
+        redisManager.setTimeout(timeout);
+        if (password != null && !password.trim().equals("")){
+            redisManager.setPassword(password);
+        }
+        return redisManager;
+    }
+    /**
+     * cacheManager 缓存 redis实现
+     * 使用的是shiro-redis开源插件
+     * @return
+     */
+    public RedisCacheManager redisCacheManager() {
+        RedisCacheManager redisCacheManager = new RedisCacheManager();
+        redisCacheManager.setRedisManager(redisManager());
+        return redisCacheManager;
+    }
 
+    /**
+     * RedisSessionDAO shiro sessionDao层的实现 通过redis
+     * 使用的是shiro-redis开源插件
+     */
+    @Bean
+    public RedisSessionDAO redisSessionDAO() {
+        RedisSessionDAO redisSessionDAO = new RedisSessionDAO();
+        redisSessionDAO.setRedisManager(redisManager());
+        return redisSessionDAO;
+    }
 }

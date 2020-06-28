@@ -1,13 +1,12 @@
 package cn.acyou.scorpioshiro.conf;
 
 import cn.acyou.scorpioshiro.conf.shiro.CustomAuthcFilter;
-import org.apache.shiro.cache.MemoryConstrainedCacheManager;
-import org.apache.shiro.mgt.DefaultSessionStorageEvaluator;
-import org.apache.shiro.mgt.DefaultSubjectDAO;
+import cn.acyou.scorpioshiro.conf.shiro.CustomSessionIdGenerator;
+import org.apache.shiro.codec.Base64;
 import org.apache.shiro.mgt.SecurityManager;
 import org.apache.shiro.spring.LifecycleBeanPostProcessor;
-import org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor;
 import org.apache.shiro.spring.web.ShiroFilterFactoryBean;
+import org.apache.shiro.web.mgt.CookieRememberMeManager;
 import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
 import org.apache.shiro.web.servlet.Cookie;
 import org.apache.shiro.web.servlet.SimpleCookie;
@@ -53,6 +52,7 @@ public class ShiroConfig {
         shiroFilterFactoryBean.setSecurityManager(securityManager);
         shiroFilterFactoryBean.setLoginUrl("/common/pleaseLogin");
         shiroFilterFactoryBean.setUnauthorizedUrl("/common/unauthorized");
+        shiroFilterFactoryBean.setSuccessUrl("/common/successLogin");
         Map<String, Filter> filters = new HashMap<>();
         filters.put("authc", new CustomAuthcFilter());
         shiroFilterFactoryBean.setFilters(filters);
@@ -84,6 +84,9 @@ public class ShiroConfig {
          *  /admin=authc,roles[admin]      表示用户必需已通过认证,并拥有admin角色才可以正常发起'/admin'请求
          *  /edit=authc,perms[admin:edit]  表示用户必需已通过认证,并拥有admin:edit权限才可以正常发起'/edit'请求
          *  /home=user     表示用户不一定需要已经通过认证,只需要曾经被Shiro记住过登录状态就可以正常发起'/home'请求
+         *
+         *  (authc)是认证过，(user)是登录过，如果开启了rememberMe功能的话，(user)也是可以通过的，而(authc)通过不了。
+         *  故我们用authc来校验一些关键操作，比如购买，我们可以采用user校验即可。而支付的时候，我们需要认证的用户，那就需要authc了。
          */
 
 
@@ -106,7 +109,7 @@ public class ShiroConfig {
         Map<String, String> filterChainDefinitionMap = new LinkedHashMap<>();
         // <!-- authc:所有url都必须认证通过才可以访问; anon:所有url都都可以匿名访问-->
 
-        filterChainDefinitionMap.put("/shiro/*", "authc");
+        filterChainDefinitionMap.put("/shiro/*", "user");
         //主要这行代码必须放在所有权限设置的最后，不然会导致所有 url 都被拦截 剩余的都需要认证
         filterChainDefinitionMap.put("/**", "anon");
         shiroFilterFactoryBean.setFilterChainDefinitionMap(filterChainDefinitionMap);
@@ -119,7 +122,7 @@ public class ShiroConfig {
         DefaultWebSecurityManager defaultSecurityManager = new DefaultWebSecurityManager();
         defaultSecurityManager.setRealm(customRealm());
         defaultSecurityManager.setSessionManager(getDefaultWebSessionManager());
-
+        defaultSecurityManager.setRememberMeManager(rememberMeManager());
         /*————————————— 缓存 —————————————————*/
         //使用内存缓存实现：
         //defaultSecurityManager.setCacheManager(new MemoryConstrainedCacheManager());
@@ -205,6 +208,30 @@ public class ShiroConfig {
     public RedisSessionDAO redisSessionDAO() {
         RedisSessionDAO redisSessionDAO = new RedisSessionDAO();
         redisSessionDAO.setRedisManager(redisManager());
+        redisSessionDAO.setSessionIdGenerator(new CustomSessionIdGenerator());
         return redisSessionDAO;
+    }
+
+
+    /**
+     * Shiro RememberMe
+     *
+     * @return
+     */
+    public CookieRememberMeManager rememberMeManager(){
+        CookieRememberMeManager rememberMeManager = new CookieRememberMeManager();
+        rememberMeManager.setCipherKey(Base64.decode("Z3VucwAAAAAAAAAAAAAAAA=="));
+        rememberMeManager.setCookie(rememberMeCookie());
+        return rememberMeManager;
+    }
+
+    public Cookie rememberMeCookie(){
+        Cookie cookie = new SimpleCookie();
+        cookie.setName("scorpio-rememberMe");
+        cookie.setHttpOnly(true);
+        cookie.setDomain("/");
+        cookie.setMaxAge(604800);
+        cookie.setValue("ok");
+        return cookie;
     }
 }

@@ -8,6 +8,7 @@ import org.apache.shiro.authc.*;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.apache.shiro.mgt.SecurityManager;
+import org.apache.shiro.session.Session;
 import org.apache.shiro.subject.Subject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -27,25 +28,29 @@ public class ShiroController {
 
 
     @RequiresPermissions("student:list")
-    @PostMapping("/listStudents")
+    @RequestMapping("/listStudents")
     public Result<List<Student>> listStudents() {
         SecurityManager securityManager = SecurityUtils.getSecurityManager();
         Subject subject = SecurityUtils.getSubject();
-        long timeout = subject.getSession().getTimeout();
+        Session session = subject.getSession();
+        Object currentUser = session.getAttribute("currentUser");
+        System.out.println(currentUser);
+        long timeout = session.getTimeout();
         System.out.println("Subject 超时时间：" + timeout);
+        System.out.println("Subject isRemembered：" + subject.isRemembered());
         List<Student> students = studentService.selectAll();
         return Result.success(students);
     }
 
     @RequiresPermissions("student:get")
-    @PostMapping("/getStudent")
+    @RequestMapping("/getStudent")
     public Result<Student> getStudent(Integer id) {
         Student student = studentService.selectByPrimaryKey(id);
         return Result.success(student);
     }
 
     @RequiresRoles("developer")
-    @PostMapping("/listStudentsForDeveloper")
+    @RequestMapping("/listStudentsForDeveloper")
     public Result<List<Student>> listStudentsForDeveloper() {
         List<Student> students = studentService.selectAll();
         return Result.success(students);

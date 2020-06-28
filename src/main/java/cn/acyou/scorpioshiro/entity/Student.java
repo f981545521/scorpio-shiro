@@ -1,5 +1,6 @@
 package cn.acyou.scorpioshiro.entity;
 
+import cn.acyou.scorpioshiro.util.RandomUtil;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import java.io.Serializable;
 import java.util.Date;
@@ -51,5 +52,23 @@ public class Student implements Serializable {
 
     public void setBirth(Date birth) {
         this.birth = birth;
+    }
+
+    public Student random() {
+        this.id = Integer.valueOf(RandomUtil.createRandom(true, 5));
+        this.name = RandomUtil.randomUserName();
+        this.age = RandomUtil.randomAge();
+        System.out.println(this);
+        return this;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", age=" + age +
+                ", birth=" + birth +
+                '}';
     }
 }
